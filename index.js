@@ -7,12 +7,12 @@ dotenv.config();
 
 const app = express(); // Initialize the Express application
 const prisma = new PrismaClient();
-app.use("/api/auth", authRoutes);
-
 
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/auth", authRoutes);
+
 
 // Test route
 app.get("/", (req, res) => {

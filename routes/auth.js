@@ -1,8 +1,9 @@
 const express = require("express");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs"); // Library for hashing passwords
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv"); // Module for loading environment variables from a .env file
 dotenv.config();
+const JWT_SECRET = process.env.JWT_SECRET; // Secret key for signing JWTs, loaded from environment variables
 const { PrismaClient } = require("@prisma/client");
 
 const router = express.Router();

@@ -40,21 +40,43 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
-// Get All Articles
+//  Get all articles with pagination
 router.get("/", async (req, res) => {
-  try {
-    const articles = await prisma.article.findMany({
-      include: {
-        author: { select: { id: true, email: true } },
-        category: true,
-      },
-    });
-    res.json(articles);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Could not fetch articles" });
-  }
-});
+    // Convert query strings to numbers, default to page 1, 10 items
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+  
+    const skip = (page - 1) * limit;
+  
+    try {
+      const [articles, total] = await Promise.all([
+        prisma.article.findMany({
+          skip,
+          take: limit,
+          include: {
+            author: { select: { id: true, email: true } },
+            category: true,
+          },
+          orderBy: {
+            createdAt: "desc", // Most recent first
+          },
+        }),
+        prisma.article.count(),
+      ]);
+  
+      res.json({
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        articles,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Could not fetch articles" });
+    }
+  });
+  
 
 //  Get Article by ID
 router.get("/:id", async (req, res) => {

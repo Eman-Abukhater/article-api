@@ -1,16 +1,16 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const jwt = require("jsonwebtoken");
-const esClient = require("../elasticsearch/client"); // Elasticsearch client
+const esClient = require("../elasticsearch/client");
 
 const router = express.Router();
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-//  Middleware to protect routes
+// Middleware to protect routes
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Get token from Bearer TOKEN
+  const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
 
   if (!token) return res.status(401).json({ error: "Token missing" });
 
@@ -21,10 +21,12 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Create Article + index in Elasticsearch with category name
 router.post("/", authenticateToken, async (req, res) => {
   const { title, content, categoryId } = req.body;
 
   try {
+    // Create article in DB
     const article = await prisma.article.create({
       data: {
         title,
@@ -32,16 +34,19 @@ router.post("/", authenticateToken, async (req, res) => {
         categoryId,
         authorId: req.user.userId,
       },
+      include: { category: true }, // Include category info here
     });
 
-    // Index in Elasticsearch
+    // Index in Elasticsearch including category name
     await esClient.index({
       index: "articles",
       id: article.id.toString(),
+      refresh: true,
       document: {
         title,
         content,
         categoryId,
+        categoryName: article.category.name, // Add category name here
         authorId: req.user.userId,
       },
     });
@@ -53,12 +58,10 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
-//  Get all articles with pagination
+// Get all articles with pagination (unchanged)
 router.get("/", async (req, res) => {
-  // Convert query strings to numbers, default to page 1, 10 items
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
-
   const skip = (page - 1) * limit;
 
   try {
@@ -71,7 +74,7 @@ router.get("/", async (req, res) => {
           category: true,
         },
         orderBy: {
-          createdAt: "desc", // Most recent first
+          createdAt: "desc",
         },
       }),
       prisma.article.count(),
@@ -90,7 +93,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-//Search articles (Elasticsearch)
+// Search articles using Elasticsearch including categoryName field
 router.get("/search", async (req, res) => {
   const { query } = req.query;
 
@@ -104,7 +107,7 @@ router.get("/search", async (req, res) => {
       query: {
         multi_match: {
           query,
-          fields: ["title", "content"],
+          fields: ["title", "content", "categoryName"], // Add categoryName here
         },
       },
     });
@@ -121,9 +124,35 @@ router.get("/search", async (req, res) => {
   }
 });
 
-//  Get Article by ID
+// Reindex all articles from DB to Elasticsearch including category name
+router.post("/reindex", authenticateToken, async (req, res) => {
+  try {
+    const articles = await prisma.article.findMany({ include: { category: true } });
+
+    const body = articles.flatMap(article => [
+      { index: { _index: "articles", _id: article.id.toString() } },
+      {
+        title: article.title,
+        content: article.content,
+        categoryId: article.categoryId,
+        categoryName: article.category.name, // Include category name here
+        authorId: article.authorId,
+      }
+    ]);
+
+    await esClient.bulk({ refresh: true, body });
+
+    res.json({ message: "Reindexing completed", count: articles.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Reindexing failed" });
+  }
+});
+
+// Get article by ID (unchanged)
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
+
   try {
     const article = await prisma.article.findUnique({
       where: { id: parseInt(id) },
@@ -140,7 +169,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-//  Update Article
+// Update article (unchanged)
 router.put("/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { title, content, categoryId } = req.body;
@@ -161,17 +190,19 @@ router.put("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// Delete Article
+// Delete article + delete from Elasticsearch (unchanged)
 router.delete("/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
+
   try {
     await prisma.article.delete({
       where: { id: parseInt(id) },
     });
-    // Remove from ES index
+
     await esClient.delete({
       index: "articles",
       id: id.toString(),
+      refresh: true,
     });
 
     res.json({ message: "Article deleted" });

@@ -8,12 +8,13 @@ const articleRoutes = require("./routes/article");
 
 const app = express(); // Initialize the Express application
 const prisma = new PrismaClient();
-
+const categoryRoutes = require("./routes/categories");
 
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/articles", articleRoutes);
+app.use("/api/categories", categoryRoutes);
 
 
 // Test route

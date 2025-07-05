@@ -2,11 +2,14 @@ const express = require("express"); // Express framework for building web applic
 const cors = require("cors");// Middleware for enabling CORS (Cross-Origin Resource Sharing) and allowing requests from different origins
 const dotenv = require("dotenv"); // Module for loading environment variables from a .env file
 const { PrismaClient } = require("@prisma/client");
-
+const authRoutes = require("./routes/auth"); // Import authentication routes
 dotenv.config();
 
 const app = express(); // Initialize the Express application
 const prisma = new PrismaClient();
+app.use("/api/auth", authRoutes);
+
+
 
 app.use(cors());
 app.use(express.json());

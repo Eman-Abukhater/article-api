@@ -56,7 +56,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ✅ Get Article by ID
+//  Get Article by ID
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {

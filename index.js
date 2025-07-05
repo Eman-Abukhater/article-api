@@ -4,6 +4,7 @@ const dotenv = require("dotenv"); // Module for loading environment variables fr
 const { PrismaClient } = require("@prisma/client");
 const authRoutes = require("./routes/auth"); // Import authentication routes
 dotenv.config();
+const articleRoutes = require("./routes/article");
 
 const app = express(); // Initialize the Express application
 const prisma = new PrismaClient();
@@ -12,6 +13,7 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
+app.use("/api/articles", articleRoutes);
 
 
 // Test route
